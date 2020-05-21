@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"Go-Projects/api/App"
+	"Go-Projects/api/services"
 	"Go-Projects/model"
 	"Go-Projects/model/common"
 	"encoding/json"
@@ -8,7 +10,11 @@ import (
 	"net/http"
 )
 
-func CreateUser(w http.ResponseWriter, r *http.Request) {
+type UserController struct {
+	App.Controller
+}
+
+func (self UserController)CreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	user := model.NewUser()
@@ -16,6 +22,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(err)
 		return
 	}
+	user.Password = common.HashPassword(user.Password)
 	if err := common.Conn().Create(&user); err != nil {
 		json.NewEncoder(w).Encode(err)
 		return
@@ -26,7 +33,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ListUsers(w http.ResponseWriter, r *http.Request)  {
+func (self UserController)ListUsers(w http.ResponseWriter, r *http.Request)  {
 	var user []model.User
 	data := common.Conn().Find(&user)
 	if data.Error != nil {
@@ -35,7 +42,7 @@ func ListUsers(w http.ResponseWriter, r *http.Request)  {
 	}
 	json.NewEncoder(w).Encode(data)
 }
-func GetUser(w http.ResponseWriter, r *http.Request)  {
+func (self UserController)GetUser(w http.ResponseWriter, r *http.Request)  {
 	params := mux.Vars(r)
 	id := params["id"]
 	user := model.NewUser()
@@ -47,7 +54,7 @@ func GetUser(w http.ResponseWriter, r *http.Request)  {
 	json.NewEncoder(w).Encode(result)
 }
 
-func UpdateUser(w http.ResponseWriter, r *http.Request)  {
+func (self UserController)UpdateUser(w http.ResponseWriter, r *http.Request)  {
 	params := mux.Vars(r)
 	id := params["id"]
 	user := model.NewUser()
@@ -66,4 +73,22 @@ func UpdateUser(w http.ResponseWriter, r *http.Request)  {
 		return
 	}
 	json.NewEncoder(w).Encode(user)
+}
+
+func  (self UserController)Login(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var userLogin *services.UserLogin
+	if err := json.NewDecoder(r.Body).Decode(&userLogin); err != nil {
+		self.JsonLogger(w, 500, "DecodingError", err)
+		self.Logger("DecodingError", "error")
+		return
+	}
+	err, user := userLogin.Format().ValidateLogin()
+	if err != "" {
+		self.Json(w, err, 200)
+		return
+	}
+	self.Json(w, user, 200)
+
 }
